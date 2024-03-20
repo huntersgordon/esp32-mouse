@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Splash Page</title>
+<style>
+    #trackpad {
+        width: 90vw;
+        height: 80vh;
+        border: 2px solid #ccc;
+        margin: 20px auto;
+        touch-action: none; /* Disable default touch actions */
+        background-color: #f0f0f0;
+        border-radius: 5px;
+    }
+    #keyboardInput {
+        width: 80%;
+        margin: 20px auto;
+        display: block;
+        padding: 10px;
+        font-size: 16px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+    }
+</style>
+</head>
+<body>
+<textarea id="keyboardInput" placeholder="Type here..." autofocus></textarea>
+<div id="trackpad"></div>
+<script>
+var ws = new WebSocket('ws://' + window.location.hostname + '/ws');
+ws.onopen = function() {
+    console.log('WebSocket connection established');
+};
+
+var trackpad = document.getElementById('trackpad');
+var isDragging = false;
+
+trackpad.addEventListener('mousedown', startDrag);
+trackpad.addEventListener('mousemove', drag);
+trackpad.addEventListener('mouseup', endDrag);
+trackpad.addEventListener('mouseleave', endDrag);
+
+trackpad.addEventListener('touchstart', startDrag);
+trackpad.addEventListener('touchmove', drag);
+trackpad.addEventListener('touchend', endDrag);
+trackpad.addEventListener('touchcancel', endDrag);
+
+function startDrag(event) {
+    event.preventDefault();
+    isDragging = true;
+}
+
+function drag(event) {
+    event.preventDefault();
+    if (isDragging) {
+        var x, y;
+        if (event.touches) { // Check if this is a touch event
+            var touch = event.touches[0]; // Get the first touch point
+            x = touch.clientX;
+            y = touch.clientY;
+        } else { // This is a mouse event
+            x = event.clientX;
+            y = event.clientY;
+        }
+
+        // Adjust x and y based on the trackpad's position
+        var rect = trackpad.getBoundingClientRect();
+        x = x - rect.left;
+        y = y - rect.top;
+
+        sendMouseMovement(x, y);
+    }
+}
+
+function endDrag(event) {
+    event.preventDefault();
+    isDragging = false;
+    sendMouseMovement(-1, -1); // Signal end of movement
+}
+
+function sendMouseMovement(x, y) {
+    var message = {
+        x: x,
+        y: y
+    };
+    ws.send(JSON.stringify(message));
+}
+
+document.getElementById('keyboardInput').addEventListener('keydown', function(event) {
+    if (event.keyCode === 8 || event.keyCode === 46) {
+        event.preventDefault(); // Prevent the default backspace behavior
+        let valueToSend = '<BK>'; // Use '\b' to represent backspace
+        ws.send(valueToSend);
+    }
+});
+document.getElementById('keyboardInput').addEventListener('input', function(event) {
+    let valueToSend = this.value;
+    if (valueToSend === ' ') {
+        valueToSend = '<SP>'; // Encode space
+    }
+    ws.send(valueToSend);
+    this.value = ''; // Clear input after sending
+});
+</script>
+</body>
+</html>
